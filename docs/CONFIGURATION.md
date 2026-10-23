@@ -15,7 +15,7 @@
 | `DATABASE_URL` | `postgresql://...` | PostgreSQL connection URL |
 | `USE_SQLITE_FALLBACK` | `true` | When true, uses embedded SQLite if PostgreSQL is unreachable |
 | `SQLITE_DB_PATH` | `./data/youpi_pg.sqlite`| Path to local SQLite database file |
-| `ENCRYPTION_MASTER_KEY` | `64-hex chars` | 256-bit key for encrypting OAuth credentials and device keys |
+| `ENCRYPTION_MASTER_KEY` | auto-generated | 256-bit key (exactly 64 hex chars) for encrypting OAuth credentials and device keys. Unset = generated once in `data/.secrets/encryption_master_key`; an invalid value stops payment-api and merchant-admin from starting |
 | `JWT_SECRET` | `32+ chars` | Secret key for customer and admin session tokens |
 | `PAYMENT_ACTIVE_WINDOW_MS` | `300000` | Duration of active payment slot (5 minutes = 300,000ms) |
 | `PAYMENT_PROCESSING_WINDOW_MS` | `30000` | Duration of verification slot (30 seconds = 30,000ms) |
@@ -25,6 +25,11 @@
 | `OBSERVER_API_TOKEN` | auto-generated | Bearer token the local Gmail/SMS observers use to submit observations (`data/.secrets/observer_api_token`) |
 | `COIN_STORE_WEBHOOK_SECRET` | auto-generated | Webhook secret seeded for the default merchant and used by the demo coin store (`data/.secrets/coin_store_webhook_secret`) |
 | `YOUPI_EXPOSE_DEV_OTP` | unset | Set to `true` for local development to get the OTP in the `send-otp` response. Ignored when `NODE_ENV=production` |
+| `SMTP_HOST` | unset | SMTP server for emailed login codes (e.g. `smtp.gmail.com`). Unset = email codes disabled, WhatsApp only |
+| `SMTP_PORT` | `587` | SMTP port; `465` implies TLS |
+| `SMTP_SECURE` | `false` | `true` for implicit TLS (port 465) |
+| `SMTP_USER` / `SMTP_PASS` | unset | SMTP login. For Gmail use an App Password, not the account password |
+| `SMTP_FROM` | `SMTP_USER` | Sender shown on the code email |
 | `YOUPI_ALLOW_DEV_TOOLS` | unset | Developer test-mode / simulator endpoints (`/admin/dev/*`, `simulate-observation`) are refused when `NODE_ENV=production` unless this is `true` |
 | `GMAIL_REDIRECT_URI` | derived | Gmail OAuth redirect URI. Defaults to `<gmail host from your configured domain>/oauth/callback` |
 | `ANDROID_HEARTBEAT_TIMEOUT_MS` | `180000` | Inactivity window before Android device is marked DISCONNECTED |

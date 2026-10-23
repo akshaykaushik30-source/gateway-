@@ -1,7 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { parseEnv } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { runMigrations } from '../packages/db/src/migrate.js';
 import { startControlCenter } from '../apps/control-center/src/index.js';
 import { startCloudflaredSafely } from '../packages/common/src/tunnel-command.js';
+
+// Services read CONTROL_CENTER_PORT from .env (the merchant-admin supervisor proxy uses it),
+// so the supervisor must bind the same port. Only that key is read here: loading the whole
+// file would also apply placeholder secrets from .env.example to the migrations below.
+let envFilePort;
+try {
+  const rootEnv = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.env');
+  envFilePort = parseEnv(fs.readFileSync(rootEnv, 'utf8')).CONTROL_CENTER_PORT;
+} catch {}
+const controlCenterPort = Number(process.env.CONTROL_CENTER_PORT || envFilePort || 8090);
 
 if (!process.env.YOUPI_MODE) process.env.YOUPI_MODE = 'localhost';
 if (!process.env.NODE_ENV) process.env.NODE_ENV = 'development';
@@ -29,10 +43,10 @@ if (tunnelCmd && tunnelCmd.trim()) {
 }
 
 // 2. Start Control Center supervisor and launch all services
-console.log('[2/2] Launching Local Process Control Center on port 8090...');
-const cc = await startControlCenter(8090);
+console.log(`[2/2] Launching Local Process Control Center on port ${controlCenterPort}...`);
+const cc = await startControlCenter(controlCenterPort);
 
-console.log('\n[✓] Control Center is online at: http://localhost:8090');
+console.log(`\n[✓] Control Center is online at: http://localhost:${controlCenterPort}`);
 console.log('[*] Starting all modular gateway services...\n');
 
 await cc.processManager.startAll();

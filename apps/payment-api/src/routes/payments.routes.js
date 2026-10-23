@@ -21,7 +21,9 @@ export function registerPaymentRoutes(server, ctx) {
     if (merchant?.branding) {
       try {
         const urls = resolveRuntimeUrls(merchant.branding);
-        if (urls && urls.checkoutUrl) return urls.checkoutUrl;
+        // Localhost mode only has hard-coded localhost URLs; BASE_CHECKOUT_URL (ctx) lets a
+        // LAN deployment hand out a checkout link other devices can open.
+        if (urls?.isProduction && urls.checkoutUrl) return urls.checkoutUrl;
       } catch {}
     }
     return ctx.checkoutBaseUrl || 'http://localhost:7000';

@@ -93,8 +93,9 @@ if (tunnelCmd && tunnelCmd.trim()) {
 }
 
 // 3. Launch Process Supervisor and Production Services
-console.log('[2/3] Launching Local Process Supervisor on port 8090...');
-const cc = await startControlCenter(8090);
+const controlCenterPort = Number(process.env.CONTROL_CENTER_PORT || 8090);
+console.log(`[2/3] Launching Local Process Supervisor on port ${controlCenterPort}...`);
+const cc = await startControlCenter(controlCenterPort);
 
 console.log('[3/3] Starting core production gateway services (Pure API & Android Observer)...\n');
 await cc.processManager.startAll();
