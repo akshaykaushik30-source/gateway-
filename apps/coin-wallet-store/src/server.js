@@ -104,7 +104,9 @@ export class CoinWalletStoreServer {
     // Canonical public origin of this store. Post-payment return URLs are built from this
     // value rather than from the request's Host / X-Forwarded-* headers, which are
     // attacker-controllable and would otherwise allow redirecting paying customers elsewhere.
-    this.publicBaseUrl = (options.publicBaseUrl || process.env.COIN_STORE_PUBLIC_URL || `http://localhost:${process.env.STORE_PORT || 5000}`)
+    // BASE_DEMO_STORE_URL is the documented .env setting; COIN_STORE_PUBLIC_URL is kept for
+    // existing deployments.
+    this.publicBaseUrl = (options.publicBaseUrl || process.env.COIN_STORE_PUBLIC_URL || process.env.BASE_DEMO_STORE_URL || `http://localhost:${process.env.STORE_PORT || 5000}`)
       .replace(/\/+$/, '');
 
     // orderId -> gateway paymentId for orders this store created (used to verify payments server-side)
@@ -498,9 +500,14 @@ export class CoinWalletStoreServer {
               createdAt: Date.now()
             });
 
-            // Normalize checkoutUrl for localhost development / testing to prevent tunnel offline issues
+            // Outside production, serve checkout through this store's /checkout reverse proxy.
+            // The store CSP (default-src 'self') only allows same-origin frames, so the link is
+            // relative: it stays on whichever host the visitor used (localhost or a LAN IP).
             let resolvedCheckoutUrl = payment.checkoutUrl;
-            if (this.publicBaseUrl.includes('localhost') || this.publicBaseUrl.includes('127.0.0.1')) {
+            const isProductionMode = process.env.YOUPI_MODE === 'production' || process.env.NODE_ENV === 'production';
+            if (!isProductionMode) {
+              resolvedCheckoutUrl = `/checkout/${payment.paymentId}`;
+            } else if (this.publicBaseUrl.includes('localhost') || this.publicBaseUrl.includes('127.0.0.1')) {
               resolvedCheckoutUrl = `${this.publicBaseUrl}/checkout/${payment.paymentId}`;
             }
 
