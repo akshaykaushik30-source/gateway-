@@ -49,6 +49,7 @@ import { registerCustomerRoutes } from './routes/customer.routes.js';
 import { registerDeviceRoutes } from './routes/device.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
 import { ObserverPollerService } from './services/observer-poller.service.js';
+import { EmailOtpService } from './services/email-otp.service.js';
 
 export function createPaymentApp(customDb = null, options = {}) {
   const db = customDb || getDatabase();
@@ -61,6 +62,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     databasePath: path.resolve(rootDir, 'data/test_berry_store.db'),
     metaFile: path.resolve(rootDir, 'data/test_whatsapp_session.json')
   }) : getWhatsAppBerryService());
+  const emailOtpService = options.emailOtpService || new EmailOtpService();
 
   const merchantRepo = new MerchantRepository(db);
   const accountRepo = new ReceivingAccountRepository(db);
@@ -377,6 +379,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     defaultMerchant,
     checkoutBaseUrl,
     whatsappBerryService,
+    emailOtpService,
     webhookEngine,
     observerPollerService,
     otpCooldownMs: options.otpCooldownMs

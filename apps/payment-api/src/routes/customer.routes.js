@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { HttpServer } from '../server.js';
 import { normalizeEmail, normalizeMobile, isValidEmail, isValidMobile, isValidPassword, safeEqual } from '@youpi/common';
+import { isDeliverableEmail } from '../services/email-otp.service.js';
 
 /** Wrong guesses tolerated per issued OTP challenge. */
 const OTP_MAX_ATTEMPTS = 5;
@@ -194,9 +195,28 @@ export function registerCustomerRoutes(server, ctx) {
 
     const existingUser = ctx.customerRepo.findByMobile(cleanMobile);
 
+    // Email channel: an existing customer only ever gets the code at the address already on
+    // their account, never one supplied in this request - otherwise anyone could take over an
+    // account by pairing its mobile number with their own inbox.
+    const useEmail = body.channel === 'email';
+    let emailTarget = null;
+    if (useEmail) {
+      if (!ctx.emailOtpService || !ctx.emailOtpService.isConfigured()) {
+        HttpServer.json(res, 503, { error: 'Email codes are not set up on this gateway. Please use WhatsApp.', code: 'EMAIL_OTP_UNAVAILABLE' });
+        return;
+      }
+      emailTarget = existingUser ? existingUser.email : (isNewUser && isValidEmail(email) ? email : null);
+      if (!isDeliverableEmail(emailTarget)) {
+        HttpServer.json(res, 400, { error: 'No email address is saved for this mobile number. Please use WhatsApp.', code: 'NO_EMAIL_ON_FILE' });
+        return;
+      }
+    }
+
     // Throttle before doing any work: otherwise this endpoint can be used to flood a
     // customer's WhatsApp with OTPs (harassment) or burn merchant messaging credits.
-    if (isOtpThrottled(cleanMobile)) {
+    // Email has its own window so a customer without WhatsApp can switch right away.
+    const throttleKey = useEmail ? `${cleanMobile}:email` : cleanMobile;
+    if (isOtpThrottled(throttleKey)) {
       HttpServer.json(res, 429, { error: `Please wait ${Math.ceil(OTP_RESEND_COOLDOWN_MS / 1000)} seconds before requesting another code.` });
       return;
     }
@@ -235,12 +255,22 @@ export function registerCustomerRoutes(server, ctx) {
       });
     }
 
-    // Dispatch via WhatsApp Berry Protocol
+    // Dispatch via email (on request) or WhatsApp Berry Protocol
     const berry = getBerry();
     let dispatchResult = { success: true, delivered: false, simulated: true };
     const displayName = existingUser?.name || name || '';
 
-    if (berry) {
+    if (useEmail) {
+      try {
+        dispatchResult = await ctx.emailOtpService.sendOtp(emailTarget, otpCode, displayName);
+      } catch (err) {
+        console.warn(`[CustomerAuth] Email OTP dispatch failed: ${err.message}`);
+        // Nothing was delivered, so don't make the customer sit out the resend cooldown.
+        otpRequestLog.delete(throttleKey);
+        HttpServer.json(res, 502, { error: 'Could not send the email. Please try again or use WhatsApp.', code: 'EMAIL_OTP_FAILED' });
+        return;
+      }
+    } else if (berry) {
       try {
         dispatchResult = await berry.sendOtp(cleanMobile, otpCode, displayName);
       } catch (err) {
@@ -254,7 +284,9 @@ export function registerCustomerRoutes(server, ctx) {
 
     HttpServer.json(res, 200, {
       success: true,
-      message: 'OTP sent to your WhatsApp number.',
+      message: useEmail ? `OTP sent to your email ${maskEmail(emailTarget)}.` : 'OTP sent to your WhatsApp number.',
+      channel: useEmail ? 'email' : 'whatsapp',
+      sentTo: useEmail ? maskEmail(emailTarget) : undefined,
       mobileNumber: cleanMobile,
       expiresInSeconds: 300,
       // Returning the OTP lets anyone log in as any number: only on explicit opt-in, never in production.

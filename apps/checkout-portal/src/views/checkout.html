@@ -515,6 +515,7 @@
         if (subtitle) subtitle.innerText = 'Enter the 6-digit code sent to your WhatsApp number';
         const badge = document.getElementById('authOtpPhoneBadge');
         if (badge) badge.innerText = '+91 ' + currentAuthMobile;
+        if (badge && badge.previousElementSibling) badge.previousElementSibling.textContent = 'Code sent to WhatsApp / SMS: ';
         const otpInput = document.getElementById('authOtpInput');
         if (otpInput) {
           otpInput.value = '';
@@ -793,6 +794,50 @@
         }
       } catch (e) {
         showOptionToast('Network error resending OTP.');
+      }
+    }
+
+    // Sends the code by email. Existing customers always get it at the address on their
+    // account (the server ignores the email sent here); new sign-ups use the one they entered.
+    // Not gated by the WhatsApp resend countdown: the server throttles email separately.
+    async function handleEmailOtp() {
+      showOptionToast('Sending code to your email...');
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/customer/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mobileNumber: currentAuthMobile,
+            name: currentAuthName,
+            email: currentAuthEmail,
+            isNewUser: true,
+            channel: 'email'
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          if (data.devOtp) lastReceivedDevOtp = data.devOtp;
+          startOtpCooldown(30);
+          showOptionToast(data.message || 'Code sent to your email.');
+          const badge = document.getElementById('authOtpPhoneBadge');
+          if (badge && data.sentTo) {
+            if (badge.previousElementSibling) badge.previousElementSibling.textContent = 'Code sent to email: ';
+            badge.textContent = data.sentTo;
+          }
+          const greeting = document.getElementById('authOtpGreeting');
+          if (greeting) greeting.textContent = 'Enter the 6-digit code from your email:';
+          const subTitle = document.getElementById('authViewSubTitle');
+          if (subTitle) subTitle.textContent = 'Enter the 6-digit code sent to your email';
+          const otpInput = document.getElementById('authOtpInput');
+          if (otpInput) {
+            otpInput.value = '';
+            otpInput.focus();
+          }
+        } else {
+          showOptionToast(data.error || 'Failed to send the code by email.');
+        }
+      } catch (e) {
+        showOptionToast('Network error sending the email code.');
       }
     }
 
