@@ -13,7 +13,7 @@
     "@youpi/core": "*",
     "@youpi/db": "*",
     "berryprotocol": "^0.1.10",
-    "nodemailer": "10.0.16",
+    "nodemailer": "10.2.1",
     "qrcode": "^1.5.4"
   }
 }
